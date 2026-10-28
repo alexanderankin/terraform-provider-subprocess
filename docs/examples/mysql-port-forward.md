@@ -4,7 +4,7 @@ This example starts `ssh -N -L` on the machine running Terraform or OpenTofu. Th
 
 Set `ssh_host`, `ssh_user`, `mysql_host`, `mysql_admin_user`, `mysql_admin_password`, and `app_password`. SSH must already be able to authenticate to the bastion without prompting. `mysql_host` is resolved from the bastion. Change `local_port` if port 13306 is occupied.
 
-The provider endpoint is known before apply. The `mysql_user` operation depends on the tunnel, so its database request runs after the forward opens. `startup_delay_ms` gives SSH one second to report a bind failure; it does not check that MySQL is ready. The MySQL provider retries connections. Creating a user requires suitable privileges, and the user password must be protected in Terraform state.
+The provider endpoint is known before apply. The `mysql_user` operation depends on the tunnel, so its database request runs after the forward opens. `wait_for_startup_delay_ms` gives SSH one second to report a bind failure; it does not check that MySQL is ready. The MySQL provider retries connections. Creating a user requires suitable privileges, and the user password must be protected in Terraform state.
 
 Once the subprocess provider is listed in the Terraform Registry, run from [`examples/mysql-port-forward`](https://github.com/alexanderankin/terraform-provider-subprocess/tree/main/examples/mysql-port-forward):
 

@@ -60,7 +60,8 @@ ephemeral "subprocess_process" "mysql_tunnel" {
     "-L", "127.0.0.1:${var.local_port}:${var.mysql_host}:${var.mysql_port}",
     "${var.ssh_user}@${var.ssh_host}",
   ]
-  startup_delay_ms = 1000
+  wait_for_startup_delay_ms = 1000
+  # wait_timeout_ms = 10000
 }
 
 provider "mysql" {

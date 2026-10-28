@@ -27,6 +27,12 @@ provider "restapi" {
 
 ephemeral "subprocess_process" "bridge" {
   command = ["my-api-bridge", "--listen", "127.0.0.1:${var.bridge_port}"]
+  # wait_timeout_ms = 10000
+
+  wait_for_listening_port {
+    port     = var.bridge_port
+    protocol = "tcp"
+  }
 }
 
 resource "time_sleep" "bridge_startup" {

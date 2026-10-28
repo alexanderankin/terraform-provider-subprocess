@@ -17,7 +17,7 @@ terraform {
 ephemeral "subprocess_process" "service" {
   command           = ["sh", "-c", "echo $$ > process.pid; exec sleep 30"]
   working_directory = path.module
-  startup_delay_ms  = 100
+  wait_for_startup_delay_ms = 100
 }
 
 resource "terraform_data" "check" {
