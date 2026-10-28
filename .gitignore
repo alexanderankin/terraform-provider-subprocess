@@ -6,3 +6,4 @@ terraform-provider-subprocess
 *.tfstate.backup
 plan
 plan*.txt
+site/

@@ -1,0 +1,19 @@
+site_name: Subprocess Terraform Provider
+site_url: https://alexanderankin.github.io/terraform-provider-subprocess/
+repo_url: https://github.com/alexanderankin/terraform-provider-subprocess
+theme:
+  name: material
+  features:
+    - content.code.copy
+nav:
+  - Overview: index.md
+  - Ephemeral process: ephemeral-resources/process.md
+  - Examples:
+      - MySQL SSH port forward: examples/mysql-port-forward.md
+      - REST API bridge: examples/restapi-bridge.md
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: .
+      check_paths: true
