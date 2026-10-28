@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with:
+        with: &setup_go_config
           go-version: 'stable'
           check-latest: 'true'
           cache: true
@@ -53,9 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
+        with: *setup_go_config
       - name: Test
         id: tests
         run: |
@@ -122,9 +120,7 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-          cache: true
+        with: *setup_go_config
       - run: go test ./...
       - name: Build release assets
         run: |
@@ -147,6 +143,28 @@ jobs:
             shasum -a 256 *.zip "terraform-provider-subprocess_${version}_manifest.json" \
               > "terraform-provider-subprocess_${version}_SHA256SUMS"
           )
+      - name: Sign and verify checksums
+        env:
+          TF_REGISTRY_SIGNING_PUBLIC_KEY: ${{ secrets.TF_REGISTRY_SIGNING_PUBLIC_KEY }}
+          TF_REGISTRY_SIGNING_PRIVATE_KEY: ${{ secrets.TF_REGISTRY_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          sign_home="$(mktemp -d)"
+          verify_home="$(mktemp -d)"
+          trap 'rm -rf "${sign_home}" "${verify_home}"' EXIT
+
+          chmod 700 "${sign_home}" "${verify_home}"
+          printf '%s\n' "${TF_REGISTRY_SIGNING_PRIVATE_KEY}" | gpg --homedir "${sign_home}" --batch --quiet --import
+          printf '%s\n' "${TF_REGISTRY_SIGNING_PUBLIC_KEY}" | gpg --homedir "${verify_home}" --batch --quiet --import
+
+          version="${RELEASE_TAG#v}"
+          checksums="dist/terraform-provider-subprocess_${version}_SHA256SUMS"
+
+          (cd dist && shasum -a 256 -c "${checksums##*/}")
+          gpg --homedir "${sign_home}" --batch --yes --pinentry-mode loopback --passphrase '' \
+            --output "${checksums}.sig" --detach-sign "${checksums}"
+          gpg --homedir "${verify_home}" --batch --verify "${checksums}.sig" "${checksums}"
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
