@@ -21,7 +21,6 @@ jobs:
         with:
           go-version: 'stable'
           check-latest: 'true'
-          go-version-file: go.mod
           cache: true
       - run: go build ./...
       - run: |
@@ -106,6 +105,8 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v5
         id: release
+        with:
+          token: '${{ secrets.RELEASE_PLEASE_TOKEN }}'
 
   publish:
     needs:
