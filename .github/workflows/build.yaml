@@ -1,0 +1,153 @@
+on:
+  pull_request:
+    branches: &branches
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+  push:
+    branches: *branches
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 'stable'
+          check-latest: 'true'
+          go-version-file: go.mod
+          cache: true
+      - run: go build ./...
+      - run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - run: |
+          go fmt ./...
+          git diff --exit-code -- '*.go'
+      - run: go vet ./...
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run: govulncheck ./...
+      # - run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - env:
+          GITHUB_TOKEN: "${{ github.token }}"
+        run: |
+          curl -fSsL --retry 5 --retry-all-errors $(
+            curl -fSsL https://api.github.com/repos/securego/gosec/releases/latest \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              | jq '.assets[] | select(.name | endswith("_linux_amd64.tar.gz")) | .browser_download_url' -r) --output gosec.tar.gz
+          sudo tar -C /usr/local/bin/ -xf gosec.tar.gz gosec
+          sudo chmod +x /usr/local/bin/gosec
+          gosec --version
+      - run: gosec ./...
+
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        id: tests
+        run: |
+          set +e
+          go test -v ./... > test-output.txt 2>&1
+          result=$?
+          cat test-output.txt
+          exit "$result"
+      - name: Update test comment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.tests.outcome != 'skipped' }}
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- subprocess-go-test -->';
+            const issue_number = context.issue.number;
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const previous = comments.find(c => c.user.type === 'Bot' && c.body?.includes(marker));
+            if ('${{ steps.tests.outcome }}' === 'success') {
+              if (previous) await github.rest.issues.deleteComment({ owner, repo, comment_id: previous.id });
+            } else {
+              const output = fs.readFileSync('test-output.txt', 'utf8').slice(-60000);
+              const body = `${marker}\n### Go tests failed\n\n<details><summary>go test -v ./...</summary>\n\n\`\`\`text\n${output}\n\`\`\`\n</details>`;
+              if (previous) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: previous.id, body });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number, body });
+              }
+            }
+
+  release_please:
+    if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+    needs:
+      - build
+      - test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-please
+      cancel-in-progress: false
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+
+  publish:
+    needs:
+      - release_please
+    if: ${{ needs.release_please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.release_please.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test ./...
+      - name: Build release assets
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          mkdir -p dist
+          for target in windows/amd64 windows/arm64 linux/amd64 linux/arm64 darwin/arm64; do
+            goos="${target%/*}"
+            goarch="${target#*/}"
+            binary="terraform-provider-subprocess_v${version}"
+            if [[ "$goos" == windows ]]; then binary="${binary}.exe"; fi
+            archive="terraform-provider-subprocess_${version}_${goos}_${goarch}.zip"
+            GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "dist/${binary}" .
+            (cd dist && zip -q "$archive" "$binary")
+            rm "dist/${binary}"
+          done
+          cp terraform-registry-manifest.json "dist/terraform-provider-subprocess_${version}_manifest.json"
+          (
+            cd dist
+            shasum -a 256 *.zip "terraform-provider-subprocess_${version}_manifest.json" \
+              > "terraform-provider-subprocess_${version}_SHA256SUMS"
+          )
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: dist/*
+          fail_on_unmatched_files: true

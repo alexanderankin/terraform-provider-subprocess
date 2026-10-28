@@ -70,7 +70,7 @@ func (r *processResource) Open(ctx context.Context, req ephemeral.OpenRequest, r
 		return
 	}
 
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command(args[0], args[1:]...) // #nosec G204 -- executing the configured command is the purpose of this provider
 	if !data.WorkingDir.IsNull() {
 		cmd.Dir = data.WorkingDir.ValueString()
 	}
