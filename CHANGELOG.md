@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0](https://github.com/alexanderankin/terraform-provider-subprocess/compare/v0.1.1...v0.2.0) (2026-10-30)
+
+
+### Features
+
+* better waiting ([4c40c13](https://github.com/alexanderankin/terraform-provider-subprocess/commit/4c40c13c043601c7a12124473ceacf49c949acfe))
+* computed outputs for waiting on inputs ([#4](https://github.com/alexanderankin/terraform-provider-subprocess/issues/4)) ([ab978e5](https://github.com/alexanderankin/terraform-provider-subprocess/commit/ab978e52d6ed81a35b807a352e3cf83cdb7acc0a))
+
+
+### Bug Fixes
+
+* scripts now work for both opentofu and terraform ([b246b00](https://github.com/alexanderankin/terraform-provider-subprocess/commit/b246b00f2149be3a33c3bc8f25af589357715126))
+* use actual version in create-mirror-folder.sh ([9a26b2d](https://github.com/alexanderankin/terraform-provider-subprocess/commit/9a26b2dbc19cf84cd62f21cccc638cc4a8896b63))
+
 ## [0.1.1](https://github.com/alexanderankin/terraform-provider-subprocess/compare/v0.1.0...v0.1.1) (2026-10-28)
 
 
