@@ -15,12 +15,32 @@ ephemeral "subprocess_process" "service" {
 ```
 
 Use `depends_on = [ephemeral.subprocess_process.service]` on operations requiring the process.
+Alternatively, set `inputs` and reference `outputs` to configure a provider after the process is ready:
+
+```hcl
+ephemeral "subprocess_process" "tunnel" {
+  command = ["ssh", "-N", "-L", "127.0.0.1:16443:cluster.example:6443", "jump.example"]
+  inputs  = { url = "https://127.0.0.1:16443" }
+
+  wait_for_listening_port {
+    port     = 16443
+    protocol = "tcp"
+  }
+}
+
+provider "kubernetes" {
+  host = ephemeral.subprocess_process.tunnel.outputs["url"]
+}
+```
+
+`outputs` copies the configured `inputs` string map after all readiness conditions succeed; it does not capture stdout or stderr. Referencing a value through `outputs` gives the provider configuration a dependency on the process. Ephemeral outputs are available only in ephemeral contexts, such as provider configuration and provisioners. They cannot be used as ordinary data source arguments.
 
 ## Arguments
 
 - `command` (required): Executable and arguments. A shell is used only if explicitly included.
 - `working_directory` (optional): Process working directory.
 - `environment` (optional): Additional environment variables.
+- `inputs` (optional): String map to pass through after the process is ready.
 - `wait_for_startup_delay_ms` (optional): Fixed wait after starting, in non-negative milliseconds.
 - `wait_for_output_regex` (optional): Go regular expression matched against complete lines from either stdout or stderr. Output must end in a newline to match.
 - `wait_for_listening_port` (repeatable block): Wait for a connection to `127.0.0.1` at `port` (1–65535). `protocol` must be `"tcp"`; UDP cannot reliably confirm readiness. Every configured port must become reachable.
@@ -31,3 +51,4 @@ All configured conditions must succeed. With no wait conditions, `Open` returns 
 ## Attributes
 
 - `pid`: Child process ID.
+- `outputs`: Copy of `inputs`, returned after the process is ready.

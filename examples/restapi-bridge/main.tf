@@ -8,10 +8,6 @@ terraform {
       source  = "Mastercard/restapi"
       version = "~> 3.0"
     }
-    time = {
-      source  = "hashicorp/time"
-      version = "~> 0.14"
-    }
   }
 }
 
@@ -20,14 +16,11 @@ variable "bridge_port" {
   default = 8080
 }
 
-provider "restapi" {
-  uri                  = "http://127.0.0.1:${var.bridge_port}"
-  write_returns_object = true
-}
-
+// start the service
 ephemeral "subprocess_process" "bridge" {
-  command = ["my-api-bridge", "--listen", "127.0.0.1:${var.bridge_port}"]
-  # wait_timeout_ms = 10000
+  command                   = ["my-api-bridge", "--listen", "127.0.0.1:${var.bridge_port}"]
+  inputs                    = { uri = "http://127.0.0.1:${var.bridge_port}" }
+  wait_for_startup_delay_ms = 10000
 
   wait_for_listening_port {
     port     = var.bridge_port
@@ -35,9 +28,10 @@ ephemeral "subprocess_process" "bridge" {
   }
 }
 
-resource "time_sleep" "bridge_startup" {
-  depends_on      = [ephemeral.subprocess_process.bridge]
-  create_duration = "10s"
+// then use the service
+provider "restapi" {
+  uri                  = ephemeral.subprocess_process.bridge.outputs["uri"]
+  write_returns_object = true
 }
 
 resource "restapi_object" "example" {
@@ -45,6 +39,4 @@ resource "restapi_object" "example" {
   data = jsonencode({
     name = "example-widget"
   })
-
-  depends_on = [time_sleep.bridge_startup]
 }
