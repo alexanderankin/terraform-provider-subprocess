@@ -60,12 +60,13 @@ ephemeral "subprocess_process" "mysql_tunnel" {
     "-L", "127.0.0.1:${var.local_port}:${var.mysql_host}:${var.mysql_port}",
     "${var.ssh_user}@${var.ssh_host}",
   ]
+  inputs                    = { endpoint = "127.0.0.1:${var.local_port}" }
   wait_for_startup_delay_ms = 1000
   # wait_timeout_ms = 10000
 }
 
 provider "mysql" {
-  endpoint = "127.0.0.1:${var.local_port}"
+  endpoint = ephemeral.subprocess_process.mysql_tunnel.outputs["endpoint"]
   username = var.mysql_admin_user
   password = var.mysql_admin_password
 }
@@ -74,6 +75,4 @@ resource "mysql_user" "app" {
   user               = var.mysql_app_user
   host               = "%"
   plaintext_password = var.mysql_app_password
-
-  depends_on = [ephemeral.subprocess_process.mysql_tunnel]
 }

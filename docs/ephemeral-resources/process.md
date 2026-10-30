@@ -33,7 +33,7 @@ provider "kubernetes" {
 }
 ```
 
-Ephemeral outputs are available only in ephemeral contexts, such as provider configuration and provisioners. They cannot be used as ordinary data source arguments.
+`outputs` copies the configured `inputs` string map after all readiness conditions succeed; it does not capture stdout or stderr. Referencing a value through `outputs` gives the provider configuration a dependency on the process. Ephemeral outputs are available only in ephemeral contexts, such as provider configuration and provisioners. They cannot be used as ordinary data source arguments.
 
 ## Arguments
 
