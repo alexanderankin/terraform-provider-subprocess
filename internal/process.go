@@ -28,6 +28,8 @@ type processModel struct {
 	Command               types.List   `tfsdk:"command"`
 	WorkingDir            types.String `tfsdk:"working_directory"`
 	Environment           types.Map    `tfsdk:"environment"`
+	Inputs                types.Map    `tfsdk:"inputs"`
+	Outputs               types.Map    `tfsdk:"outputs"`
 	WaitForStartupDelayMs types.Int64  `tfsdk:"wait_for_startup_delay_ms"`
 	WaitForOutputRegex    types.String `tfsdk:"wait_for_output_regex"`
 	WaitTimeoutMs         types.Int64  `tfsdk:"wait_timeout_ms"`
@@ -49,7 +51,7 @@ func (r *processResource) Metadata(_ context.Context, req ephemeral.MetadataRequ
 
 func (r *processResource) Schema(_ context.Context, _ ephemeral.SchemaRequest, resp *ephemeral.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Starts a local process when this ephemeral resource opens and kills it when it closes. Use depends_on to order other operations after it.",
+		Description: "Starts a local process when this ephemeral resource opens and kills it when it closes. Optional inputs are returned as outputs after the process is ready.",
 		Attributes: map[string]schema.Attribute{
 			"command": schema.ListAttribute{
 				Description: "Executable and arguments, without a shell. For shell features, explicitly invoke a shell (for example, [\"sh\", \"-c\", \"...\"]).",
@@ -58,6 +60,8 @@ func (r *processResource) Schema(_ context.Context, _ ephemeral.SchemaRequest, r
 			},
 			"working_directory":         schema.StringAttribute{Description: "Working directory for the process.", Optional: true},
 			"environment":               schema.MapAttribute{Description: "Environment variables added to the current environment.", ElementType: types.StringType, Optional: true},
+			"inputs":                    schema.MapAttribute{Description: "Values to return after the process is ready.", ElementType: types.StringType, Optional: true},
+			"outputs":                   schema.MapAttribute{Description: "Values from inputs, available after the process is ready.", ElementType: types.StringType, Computed: true},
 			"wait_for_startup_delay_ms": schema.Int64Attribute{Description: "Wait this many non-negative milliseconds after starting.", Optional: true},
 			"wait_for_output_regex":     schema.StringAttribute{Description: "Wait for a complete stdout or stderr line matching this regex.", Optional: true},
 			"wait_timeout_ms":           schema.Int64Attribute{Description: "Optional timeout for the entire wait after process start", Optional: true},
@@ -173,6 +177,7 @@ func (r *processResource) Open(ctx context.Context, req ephemeral.OpenRequest, r
 		return
 	}
 	data.Pid = types.Int64Value(int64(cmd.Process.Pid))
+	data.Outputs = data.Inputs
 	resp.Diagnostics.Append(resp.Result.Set(ctx, &data)...)
 	if !resp.Diagnostics.HasError() {
 		resp.Diagnostics.Append(resp.Private.SetKey(ctx, "pid", []byte(strconv.Itoa(cmd.Process.Pid)))...)
