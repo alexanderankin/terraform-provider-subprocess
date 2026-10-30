@@ -21,10 +21,16 @@ plugin_cache_dir = "$HOME/.terraform.d/plugin-cache"
 provider_installation {
   filesystem_mirror {
     path    = "${mirror_root}"
-    include = ["registry.terraform.io/alexanderankin/subprocess"]
+    include = [
+      "registry.terraform.io/alexanderankin/subprocess",
+      "registry.opentofu.org/alexanderankin/subprocess",
+    ]
   }
   direct {
-    exclude = ["registry.terraform.io/alexanderankin/subprocess"]
+    exclude = [
+      "registry.terraform.io/alexanderankin/subprocess",
+      "registry.opentofu.org/alexanderankin/subprocess",
+    ]
   }
 }
 EOF
