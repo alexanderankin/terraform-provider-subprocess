@@ -2,6 +2,8 @@ package internal
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -9,6 +11,48 @@ import (
 	"testing"
 	"time"
 )
+
+func TestWaitChildHelper(t *testing.T) {
+	if os.Getenv("SUBPROCESS_TEST_WAIT_CHILD_HELPER") != "1" {
+		return
+	}
+	index := 0
+	for index < len(os.Args) && os.Args[index] != "--" {
+		index++
+	}
+	if index+1 >= len(os.Args) {
+		os.Exit(2)
+	}
+	switch os.Args[index+1] {
+	case "output":
+		output := os.Stdout
+		if os.Args[index+2] == "stderr" {
+			output = os.Stderr
+		}
+		_, _ = fmt.Fprint(output, os.Args[index+3])
+		time.Sleep(5 * time.Second)
+	case "sleep":
+		time.Sleep(5 * time.Second)
+	case "exit7":
+		os.Exit(7)
+	case "delayedExit7":
+		time.Sleep(time.Second)
+		os.Exit(7)
+	default:
+		os.Exit(2)
+	}
+}
+
+func runWaitChildHelper(t *testing.T, args ...string) *exec.Cmd {
+	t.Helper()
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(executable, append([]string{"-test.run=^TestWaitChildHelper$", "--"}, args...)...)
+	cmd.Env = append(os.Environ(), "SUBPROCESS_TEST_WAIT_CHILD_HELPER=1")
+	return cmd
+}
 
 func TestWaitForOutputRegex(t *testing.T) {
 	for _, tc := range []struct {
@@ -24,13 +68,11 @@ func TestWaitForOutputRegex(t *testing.T) {
 		{name: "abcc without newline", output: "abcc"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var script string
+			stream := "stdout"
 			if tc.stderr {
-				script = "printf '%s' \"$1\" >&2; exec sleep 5"
-			} else {
-				script = "printf '%s' \"$1\"; exec sleep 5"
+				stream = "stderr"
 			}
-			cmd := exec.Command("sh", "-c", script, "sh", tc.output)
+			cmd := runWaitChildHelper(t, "output", stream, tc.output)
 
 			matched := make(chan struct{}, 1)
 			regex := regexp.MustCompile("abcc+")
@@ -54,7 +96,7 @@ func TestWaitForOutputRegex(t *testing.T) {
 }
 
 func TestWaitForStartupDelay(t *testing.T) {
-	cmd := exec.Command("sleep", "5")
+	cmd := runWaitChildHelper(t, "sleep")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +114,7 @@ func TestWaitForStartupDelay(t *testing.T) {
 func TestWaitTimeoutBeforeDelay(t *testing.T) {
 	for _, delay := range []int64{1000, 300001, 1<<63 - 1} {
 		t.Run(strconv.FormatInt(delay, 10), func(t *testing.T) {
-			cmd := exec.Command("sleep", "5")
+			cmd := runWaitChildHelper(t, "sleep")
 			if err := cmd.Start(); err != nil {
 				t.Fatal(err)
 			}
@@ -88,7 +130,7 @@ func TestWaitTimeoutBeforeDelay(t *testing.T) {
 }
 
 func TestProcessExitDuringWait(t *testing.T) {
-	cmd := exec.Command("sh", "-c", "exit 7")
+	cmd := runWaitChildHelper(t, "exit7")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +154,7 @@ func TestProcessExitDuringWait(t *testing.T) {
 }
 
 func TestProcessExitAfterOpen(t *testing.T) {
-	cmd := exec.Command("sh", "-c", "sleep 0.2; exit 7")
+	cmd := runWaitChildHelper(t, "delayedExit7")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -127,13 +169,13 @@ func TestProcessExitAfterOpen(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "exit status 7") {
 			t.Fatalf("unexpected exit status: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("expected exit notification before Close")
 	}
 }
 
 func TestCloseSuppressesExitLog(t *testing.T) {
-	cmd := exec.Command("sleep", "5")
+	cmd := runWaitChildHelper(t, "sleep")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}

@@ -21,13 +21,8 @@ var supervisor Supervisor
 // BecomeSupervisor receives only PIDs of commands the provider successfully started.
 // EOF means the provider is gone, so any registered processes must be killed.
 func BecomeSupervisor() int {
-	pipe := os.NewFile(3, "process-pids")
-	if pipe == nil {
-		return 1
-	}
-	defer func() { _ = pipe.Close() }()
 	pids := make(map[int]struct{})
-	scanner := bufio.NewScanner(pipe)
+	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) < 2 {
@@ -65,7 +60,7 @@ func EnsureSupervisor() (*Supervisor, error) {
 			return
 		}
 		cmd := exec.Command(executable, "--subprocess-supervisor") // #nosec G204 -- executable is this provider binary
-		cmd.ExtraFiles = []*os.File{read}
+		cmd.Stdin = read
 		if err := cmd.Start(); err != nil {
 			_ = read.Close()
 			_ = write.Close()

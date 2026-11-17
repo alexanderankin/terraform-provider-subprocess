@@ -46,7 +46,11 @@ jobs:
       - run: gosec ./...
 
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       pull-requests: write
@@ -56,6 +60,7 @@ jobs:
         with: *setup_go_config
       - name: Test
         id: tests
+        shell: bash
         run: |
           set +e
           go test -v ./... > test-output.txt 2>&1
@@ -68,7 +73,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const marker = '<!-- subprocess-go-test -->';
+            const marker = '<!-- subprocess-go-test:${{ matrix.os }} -->';
             const issue_number = context.issue.number;
             const { owner, repo } = context.repo;
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
@@ -77,7 +82,7 @@ jobs:
               if (previous) await github.rest.issues.deleteComment({ owner, repo, comment_id: previous.id });
             } else {
               const output = fs.readFileSync('test-output.txt', 'utf8').slice(-60000);
-              const body = `${marker}\n### Go tests failed\n\n<details><summary>go test -v ./...</summary>\n\n\`\`\`text\n${output}\n\`\`\`\n</details>`;
+              const body = `${marker}\n### Go tests failed on ${{ matrix.os }}\n\n<details><summary>go test -v ./...</summary>\n\n\`\`\`text\n${output}\n\`\`\`\n</details>`;
               if (previous) {
                 await github.rest.issues.updateComment({ owner, repo, comment_id: previous.id, body });
               } else {
