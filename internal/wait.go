@@ -15,6 +15,7 @@ import (
 
 type runningProcess struct {
 	cmd              *exec.Cmd
+	onExit           func()
 	started          time.Time
 	done             chan struct{}
 	exitErr          error // written before done is closed
@@ -25,10 +26,13 @@ type runningProcess struct {
 	onUnexpectedExit func(error)
 }
 
-func startProcess(cmd *exec.Cmd, onUnexpectedExit func(error)) *runningProcess {
-	p := &runningProcess{cmd: cmd, started: time.Now(), done: make(chan struct{}), onUnexpectedExit: onUnexpectedExit}
+func startProcess(cmd *exec.Cmd, onUnexpectedExit func(error), onExit func()) *runningProcess {
+	p := &runningProcess{cmd: cmd, onExit: onExit, started: time.Now(), done: make(chan struct{}), onUnexpectedExit: onUnexpectedExit}
 	go func() {
 		err := cmd.Wait()
+		if p.onExit != nil {
+			p.onExit()
+		}
 		p.mu.Lock()
 		p.exitErr = err
 		p.exited = true

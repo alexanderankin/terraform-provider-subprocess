@@ -39,7 +39,7 @@ func TestWaitForOutputRegex(t *testing.T) {
 			if err := cmd.Start(); err != nil {
 				t.Fatal(err)
 			}
-			process := startProcess(cmd, nil)
+			process := startProcess(cmd, nil, nil)
 			defer func() { _ = process.stop() }()
 			timeoutMs := int64(500)
 			err := waitForReady(context.Background(), process, waitConfig{outputRegex: regex, timeoutMs: &timeoutMs}, matched)
@@ -58,7 +58,7 @@ func TestWaitForStartupDelay(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	process := startProcess(cmd, nil)
+	process := startProcess(cmd, nil, nil)
 	defer func() { _ = process.stop() }()
 	err := waitForReady(context.Background(), process, waitConfig{delayMs: new(int64(40))}, nil)
 	if err != nil {
@@ -76,7 +76,7 @@ func TestWaitTimeoutBeforeDelay(t *testing.T) {
 			if err := cmd.Start(); err != nil {
 				t.Fatal(err)
 			}
-			process := startProcess(cmd, nil)
+			process := startProcess(cmd, nil, nil)
 			defer func() { _ = process.stop() }()
 			timeout := int64(20)
 			err := waitForReady(context.Background(), process, waitConfig{delayMs: &delay, timeoutMs: &timeout}, nil)
@@ -93,7 +93,7 @@ func TestProcessExitDuringWait(t *testing.T) {
 		t.Fatal(err)
 	}
 	logged := make(chan error, 1)
-	process := startProcess(cmd, func(err error) { logged <- err })
+	process := startProcess(cmd, func(err error) { logged <- err }, nil)
 	defer func() { _ = process.stop() }()
 	delay := int64(500)
 	timeout := int64(1000)
@@ -117,7 +117,7 @@ func TestProcessExitAfterOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 	logged := make(chan error, 1)
-	process := startProcess(cmd, func(err error) { logged <- err })
+	process := startProcess(cmd, func(err error) { logged <- err }, nil)
 	defer func() { _ = process.stop() }()
 	if err := process.markOpened(); err != nil {
 		t.Fatal(err)
@@ -138,7 +138,7 @@ func TestCloseSuppressesExitLog(t *testing.T) {
 		t.Fatal(err)
 	}
 	logged := make(chan error, 1)
-	process := startProcess(cmd, func(err error) { logged <- err })
+	process := startProcess(cmd, func(err error) { logged <- err }, nil)
 	if err := process.markOpened(); err != nil {
 		t.Fatal(err)
 	}
