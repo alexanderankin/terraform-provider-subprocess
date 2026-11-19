@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexanderankin/terraform-provider-subprocess/internal/supervisor"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -161,8 +162,19 @@ func (r *processResource) Open(ctx context.Context, req ephemeral.OpenRequest, r
 	cmd.Stdout = newLineMatcher(config.outputRegex, matched)
 	cmd.Stderr = newLineMatcher(config.outputRegex, matched)
 	cmd.WaitDelay = time.Second // Bound inherited output pipes after the direct child exits.
+	super, err := supervisor.EnsureSupervisor()
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to start process supervisor", err.Error())
+		return
+	}
 	if err := cmd.Start(); err != nil {
 		resp.Diagnostics.AddError("Failed to start process", err.Error())
+		return
+	}
+	if err := super.UpdateSupervisor(cmd.Process.Pid, true); err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		resp.Diagnostics.AddError("Failed to register process with supervisor", err.Error())
 		return
 	}
 	process := startProcess(cmd, func(err error) {
@@ -170,6 +182,8 @@ func (r *processResource) Open(ctx context.Context, req ephemeral.OpenRequest, r
 			"pid":         cmd.Process.Pid,
 			"exit_status": processExit(err),
 		})
+	}, func() {
+		_ = super.UpdateSupervisor(cmd.Process.Pid, false)
 	})
 	if err := waitForReady(ctx, process, config, matched); err != nil {
 		_ = process.stop()
