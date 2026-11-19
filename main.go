@@ -14,11 +14,13 @@ import (
 var version = "dev"
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "--subprocess-supervisor" {
+	debug := flag.Bool("debug", false, "enable provider debugging")
+	supervisorMode := flag.Bool("subprocess-supervisor", false, "run the process supervisor")
+	flag.Parse()
+
+	if *supervisorMode {
 		os.Exit(supervisor.BecomeSupervisor())
 	}
-	debug := flag.Bool("debug", false, "enable provider debugging")
-	flag.Parse()
 
 	err := providerserver.Serve(context.Background(), NewProvider(version), providerserver.ServeOpts{
 		Address: "registry.terraform.io/alexanderankin/subprocess",
